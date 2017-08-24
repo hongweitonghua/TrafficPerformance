@@ -48,6 +48,14 @@ apiRoutes.get('/electric',function(req,res){
       data:electric
     });
 });
+// 暴露能源信息（柴油）的json接口
+var diesel = require('../src/mock/data/diesel.json');  
+apiRoutes.get('/diesel',function(req,res){
+    res.json({
+      errno:0,
+      data:diesel
+    });
+});
 
 // 暴露能源使用总量信息的json接口
 var energyTotalUse = require('../src/mock/data/energyTotalUse.json');  

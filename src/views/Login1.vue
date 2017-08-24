@@ -21,7 +21,6 @@
   export default {
     data() {
       return {
-      return {
         logining: false,
         ruleForm2: {
           account: 'admin',
@@ -38,7 +37,7 @@
           ]
         },
         checked: true
-      };
+      }
     },
     methods: {
       handleReset2() {

@@ -1,8 +1,8 @@
 <template>
     <section class="chart">
         <el-row>
-            <el-col class="chart-container">
-                <div id="energyDatainHeatMap" style="width:100%; height:500px;">
+            <el-col>
+                <div id="energyDatainHeatMap" style="width:1000px;height:500px;" class = "chart-container">
                     
                 </div>
             </el-col>
@@ -10,8 +10,34 @@
     </section>
 </template>
 
-<script>
-    import echarts from 'echarts'
+<script > 
+    export default{
+        /*components: {
+            'remote-js': {
+                render(createElement) {
+                    return createElement('script', { attrs: { type: 'text/javascript', src: this.src }});
+                },
+                props: {
+                    src: { type: String, required: true },
+                },
+            },
+        },*/
+        methods:{
+            initMap(){                        
+                window.maplet = new Maplet('energyDatainHeatMap');
+                window.maplet.centerAndZoom(new MPoint(121.0,29.7), 5);  
+                window.maplet.addControl(new MStandardControl());               
+            }
+        },
+        mounted: function () {
+            this.initMap();
+        },
+        updated: function () {
+            
+        }
+
+    }
+    /*import echarts from 'echarts'
     require('echarts/extension/bmap/bmap')
     export default{
         methods:{
@@ -76,7 +102,7 @@
         updated: function () {
             this.drawCharts()
         }
-    }
+    }*/
 
 </script>
 
@@ -85,18 +111,10 @@
 <style scoped lang="scss">
     .chart {
         width: 100%;
-        float: left;
         .chart-container{
-             background-color: #F2F2F2; 
-            .chart-header{
-                float: right;
-                margin-bottom: 20px;
-                margin-left: 20px;
-                position: relative;
-            }
-            .chart-content{
-                overflow: hidden;
-            }
+            background-color: #F2F2F2; 
+            
+            
         }
         
     }

@@ -10,13 +10,10 @@
 				</div>
 			</el-col>
 			<el-col :span="10" class="userinfo">
-			<span class="role">管理员</span>
 				<el-dropdown trigger="hover">				
-					<span class="el-dropdown-link userinfo-inner"><img :src="this.sysUserAvatar" /> {{sysUserName}}</span>
+					<span id="name_span" class="el-dropdown-link userinfo-inner">admin</span>
 					<el-dropdown-menu slot="dropdown">
-						<el-dropdown-item>我的消息</el-dropdown-item>
-						<el-dropdown-item @click.native="setting">设置</el-dropdown-item>
-						<el-dropdown-item divided @click.native="logout">退出登录</el-dropdown-item>
+						<el-dropdown-item @click.native="logout">退出登录</el-dropdown-item>
 					</el-dropdown-menu>
 				</el-dropdown>
 			</el-col>
@@ -29,7 +26,7 @@
 					<template v-for="(item,index) in $router.options.routes" v-if="!item.hidden">
 						<el-submenu :index="index+''" v-if="!item.leaf">
 							<template slot="title"><i :class="item.iconCls"></i>{{item.name}}</template>
-							<el-menu-item v-for="child in item.children" :index="child.path" :key="child.path" v-if="!child.hidden">{{child.name}}</el-menu-item>
+							<el-menu-item v-for="child in item.children" :index="child.path" :key="child.path" v-if="!child.hidden &&child.pri&& child.pri.indexOf($userInfo.roleType)!=-1">{{child.name}}</el-menu-item>
 						</el-submenu>
 						<el-menu-item v-if="item.leaf&&item.children.length>0" :index="item.children[0].path"><i :class="item.iconCls"></i>{{item.children[0].name}}</el-menu-item>
 					</template>
@@ -54,7 +51,7 @@
 			<section class="content-container">
 				<div class="grid-content bg-purple-light">
 					<el-col :span="24" class="breadcrumb-container">
-						<strong class="title">{{$route.name}}</strong>
+						<strong class="title" >{{$route.name}}</strong>
 						<el-breadcrumb separator="/" class="breadcrumb-inner">
 							<el-breadcrumb-item v-for="item in $route.matched" :key="item.path">
 								{{ item.name }}
@@ -83,13 +80,16 @@
 
 <script>
 
+import {getCookie,delCookie,setCookie} from '../common/js/Cookie.js';
+
+
+
 	export default {
 		data() {
 			return {
-				sysName:'Traffic ADMIN',
+				sysName:'浙江省能耗统计',
 				collapsed:false,
-				sysUserName: '',
-				sysUserAvatar: '',
+
 				form: {
 					name: '',
 					region: '',
@@ -99,9 +99,12 @@
 					type: [],
 					resource: '',
 					desc: ''
-				}
+				},
+
+
 			}
 		},
+
 		methods: {
 			onSubmit() {
 				console.log('submit!');
@@ -115,18 +118,26 @@
 			},
 			handleselect: function (a, b) {
 			},
-			//头部-设置
-			setting(){
-				this.$router.push('/table');
-			},
 			//退出登录
 			logout: function () {
 				var _this = this;
 				this.$confirm('确认退出吗?', '提示', {
 					type: 'info'
 				}).then(() => {
-					sessionStorage.removeItem('user');
-					_this.$router.push('/login');
+				_this.$router.push('/login');
+            $.get(this.Constant.ajaxAddress+"/logout.json",
+				{ username:_this.$userInfo.username,
+				  token:_this.$token}).done(function(data){
+					if(data.errCode==12){
+						_this.$userInfo = null;
+						_this.$token = null;
+						sessionStorage.removeItem('user');
+
+						_this.$router.push('/login');
+					}else{
+						window.alert("登出失败")
+					}
+				})
 				}).catch(() => {
 
 				});
@@ -144,13 +155,9 @@
 
 		},
 		mounted() {
-			//获取用户信息
-			var user = sessionStorage.getItem('user');
-			if (user) {
-				user = JSON.parse(user);
-				this.sysUserName = user.name || '';
-				this.sysUserAvatar = user.avatar || '';
-			}
+
+			 document.getElementById('name_span').innerHTML = this.$userInfo.username;
+
 			console.log($('#sidebar-hook'));
 			$('#sidebar-hook').niceScroll({
    					cursorcolor: "#6bc5a4",//#CC0071 光标颜色E4F1F1

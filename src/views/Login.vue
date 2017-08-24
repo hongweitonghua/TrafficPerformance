@@ -1,7 +1,7 @@
 <template>
   <div class="login-wrapper">
     <el-form :model="ruleForm2" :rules="rules2" ref="ruleForm2" label-position="left" label-width="0px" class="demo-ruleForm login-container">
-    <h3 class="title">后台管理系统</h3>
+    <h3 class="title">能源监测平台</h3>
     <el-form-item prop="account">
       <el-input type="text" v-model="ruleForm2.account" auto-complete="off" placeholder="账号"></el-input>
     </el-form-item>
@@ -9,7 +9,7 @@
       <el-input type="password" v-model="ruleForm2.checkPass" auto-complete="off" placeholder="密码"></el-input>
     </el-form-item>
     <el-checkbox v-model="checked" checked class="remember" fill="#6bc5a4">记住密码</el-checkbox>
-    <span class="forgetPwd"  @click="">
+    <span class="forgetPwd" >
          忘记密码？
     </span>
    <!-- <input type="checkbox" name="rempwd" class="remember" v-model="checked" checked>记住密码 -->
@@ -18,12 +18,12 @@
         <i class="fa fa-check"></i></el-button>
       <!--<el-button @click.native.prevent="handleReset2">重置</el-button>-->
     </el-form-item>
-     <div class="registration">
+     <!-- <div class="registration">
         还没有账号?
           <span class="signup"  @click="handleRegister">
               点击注册
           </span>
-    </div>
+    </div> -->
   </el-form>
  
   </div>
@@ -31,6 +31,9 @@
 
 <script>
   import { requestLogin } from '../api/api';
+  import {getCookie,delCookie,setCookie} from '../common/js/Cookie.js';
+  import vue from 'vue';
+  
   //import NProgress from 'nprogress'
   export default {
     data() {
@@ -58,27 +61,32 @@
         this.$refs.ruleForm2.resetFields();
       },
       handleSubmit2(ev) {
+        
         var _this = this;
         this.$refs.ruleForm2.validate((valid) => {
           if (valid) {
             this.logining = true;
             //NProgress.start();
             var loginParams = { username: this.ruleForm2.account, password: this.ruleForm2.checkPass };
-            //验证用户名密码
-            requestLogin(loginParams).then(data => {
-              this.logining = false;
-              //NProgress.done();
-              let { msg, code, user } = data;
-              if (code !== 200) {
-                this.$message({
-                  message: msg,
-                  type: 'error'
-                });
-              } else {
-                sessionStorage.setItem('user', JSON.stringify(user));
-                this.$router.push({ path: '/index' });
-              }
-            });
+            $.get(this.Constant.ajaxAddress+"/login.json",
+                                              { username:loginParams.username,
+                                                password:$.md5(loginParams.password)}).done(function(data){
+              _this.logining = false;
+              console.log(data);
+              if(data.errCode==10){
+                  // vue.prototype.$token = data.token;
+                  // vue.prototype.$userInfo = data.userInfo;
+                  var c = JSON.stringify(data.userInfo);
+                  setCookie('token',data.token);
+                  setCookie('userInfo',c);
+                  console.log(document.cookie);
+                  _this.$router.push({ path: '/index' });
+                }else{
+                  window.alert("用户名或者密码错误");
+                  
+                }
+            })
+            
           } else {
             console.log('error submit!!');
             return false;

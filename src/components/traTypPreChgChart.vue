@@ -1,17 +1,27 @@
-<<template>
-  <section>
+<template>
+  <section class = "chart">
       <el-row>
-            <el-col>
-                <el-date-picker
-                    v-model="year"
-                    type="year"
-                    placeholder="选择年">
-                </el-date-picker>
+            <el-col class="chart-container">
+                <div class="chart-header">
+                    <el-date-picker
+                        v-model="year"
+                        align="right"
+                        type="year"
+                        placeholder="选择年"
+                        @change="selectYearMonth"
+                        :picker-options="pickerOptions0">
+                    </el-date-picker>
+                </div> 
             </el-col>
       </el-row>
       <el-row>
-            <el-col>
-                <div id="traTypPreChgChart"style="width:100%; height:400px;" class="chart-content"></div>
+            <el-col class="chart-container">
+                <div id="allEngChgChart" style="width:100%; height:400px;" class="chart-content"></div>
+            </el-col>
+      </el-row>  
+      <el-row>
+            <el-col class="chart-container">
+                <div id="unitEngChgChart" style="width:100%; height:400px;" class="chart-content"></div>
             </el-col>
       </el-row>    
   </section>
@@ -19,104 +29,295 @@
 
 
 <script>
+
+import {getCookie,delCookie,setCookie} from '../common/js/Cookie.js';
+var dataForMonEngUnit =[];
+var dataForMonEngAll = [];
+var unitEngChgChart;
+var allEngChgChart;
+
+var beforeYear = '';
+var requestData = {};
+var _year = (new Date).getFullYear().toString();
+
+var optionMonEngUnit = {
+    title: {
+        text: '单位能耗变化趋势',
+        left:'center'
+    },
+    dataZoom: [
+        {
+            id: 'dataZoomX',
+            type: 'slider',
+            xAxisIndex: [0],
+            filterMode: 'filter'
+        }
+    ],
+    legend: {
+        data:[],
+        top : 30
+    },
+    tooltip : {
+        trigger: 'axis',
+        axisPointer : {            // 坐标轴指示器，坐标轴触发有效
+            type : 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
+        }
+    },
+    toolbox: {
+        show : true,
+        feature : {
+            mark : {show: true},
+            magicType : {show: true, type: ['line', 'bar']},
+            dataView : {readOnly:false},
+            saveAsImage : {show: true}
+        },
+        right:'3%'
+    },
+    xAxis : [
+        {
+            type : 'category',
+            data : ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+            name :'月份',
+            nameGap : 5
+        }
+    ],
+    yAxis : [
+        {
+            type : 'value',
+            name: '单位使用能耗(单位：万吨标准煤/亿人公里或万吨标准煤/亿吨公里)',
+            nameLocation:'middle',
+            nameGap:'40',
+            axisLabel: {
+                formatter: '{value}'
+            },
+            axisPointer: {
+                snap: true
+            }
+        }
+    ],
+    series : []
+
+};
+
+var optionMonEngAll = {
+    title: {
+        text: '总能耗变化趋势',
+        left:'center'
+    },
+    dataZoom: [
+        {
+            id: 'dataZoomX',
+            type: 'slider',
+            xAxisIndex: [0],
+            filterMode: 'filter'
+        }
+    ],
+    legend: {
+        data:[],
+        top : 30
+    },
+    tooltip : {
+        trigger: 'axis',
+        axisPointer : {            // 坐标轴指示器，坐标轴触发有效
+            type : 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
+        }
+    },
+    toolbox: {
+        show : true,
+        feature : {
+            mark : {show: true},
+            magicType : {show: true, type: ['line', 'bar']},
+            dataView : {readOnly:false},
+            saveAsImage : {show: true}
+        },
+        right:'3%'
+    },
+    xAxis : [
+        {
+            type : 'category',
+            data : ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+            name :'月份',
+            nameGap : 5
+        }
+    ],
+    yAxis : [
+        {
+            type : 'value',
+            name: '能耗(单位：万吨标准煤)',
+            axisLabel: {
+                formatter: '{value}'
+            },
+            axisPointer: {
+                snap: true
+            }
+        }
+    ],
+    series : []
+
+};
+
+function setData(res){
+    var monEngMap ={};
+    var monEngUnitSeries =[];
+    var monEngAllSeries =[];
+
+    var xAisMon = [_year+'-01',_year+'-02',_year+'-03',_year+'-04',_year+'-05',_year+'-06',
+            _year+'-07',_year+'-08',_year+'-09',_year+'-10',_year+'-11',_year+'-12']
+    
+    res.traTypOther.forEach(function(element){ 
+        element.traTypMo.forEach(function(e2){
+            if(!monEngMap[element.baseTyp])
+                monEngMap[element.baseTyp] ={};
+            if(!monEngMap[element.baseTyp][e2.type])
+                monEngMap[element.baseTyp][e2.type] =[0,0];
+            var t = monEngMap[element.baseTyp][e2.type];
+            t[0] += e2.typDatOfAllEng;
+            t[1] += e2.typDatOfAllLen;
+            monEngMap[element.baseTyp][e2.type] =t;
+        });
+    });
+    res.xs[1].forEach(function(element){
+        var tmpUnitEngDatas = [];
+        var tmpAllEngDatas =[];
+        if(!monEngMap[element]){
+            var tmpSeriseObj = {
+                name:element,
+                type:'line',
+                data:[]
+            };
+            monEngUnitSeries.push(tmpSeriseObj);
+            monEngAllSeries.push(tmpSeriseObj);
+        }else{
+            xAisMon.forEach(function(e2){
+                var t = monEngMap[element][e2];   
+                if(t){
+                    tmpUnitEngDatas.push((t[0]/t[1]).toFixed(2))
+                    tmpAllEngDatas.push((t[0]/10000).toFixed(2));
+                }else{
+                    tmpUnitEngDatas.push(0);
+                    tmpAllEngDatas.push(0);
+                }
+            });
+            var tmpSeriseObj={
+                name:element,
+                type:'line',
+                data:tmpUnitEngDatas
+            };
+            monEngUnitSeries.push(tmpSeriseObj);
+            tmpSeriseObj={
+                name:element,
+                type:'line',
+                data:tmpAllEngDatas
+            };
+            monEngAllSeries.push(tmpSeriseObj);
+
+        }
+    });
+
+    dataForMonEngUnit.splice(0,dataForMonEngUnit.length);
+    dataForMonEngUnit.push(res.xs[1]);
+    dataForMonEngUnit.push(res.xs[0]);
+    dataForMonEngUnit.push(monEngUnitSeries);
+
+    dataForMonEngAll.splice(0,dataForMonEngAll.length);
+    dataForMonEngAll.push(res.xs[1]);
+    dataForMonEngAll.push(res.xs[0]);
+    dataForMonEngAll.push(monEngAllSeries);
+};
+
+
+
 export default {
     data(){
         return {
-            year:''
+            year:'',
+            pickerOptions0: {
+                disabledDate(time) {
+                    if((new Date()).getMonth==0)
+                        return time.getFullYear()>=(new Date()).getFullYear();
+                    else
+                        return time.getFullYear()>(new Date()).getFullYear();
+                }
+            }
         }
     },
     methods:{
-          darwTraTypPreChgChart(){
-            let traTypPreChgChart = echarts.init(document.getElementById('traTypPreChgChart'));
-            let option = {
-                title : {
-                    text: '',
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: {
-                        type: 'cross'
-                    }
-                },
-                legend: {
-                    data:['道路客运','道路货运','公交客运','出租车运输','内河运输','海洋货运','海洋客运']
-                },
-                toolbox: {
-                    show : true,
-                    feature : {
-                        dataView : {show: true, readOnly: false}
-                    }
-                },
-                xAxis : [
-                    {
-                        type : 'category',
-                        boundaryGap: false,
-                        data : ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
-                    }
-                ],
-                yAxis : [
-                    {
-                        type : 'value',
-                        name: '单位使用能耗(单位：万吨标准煤/亿人公里或万吨标准煤/亿吨公里)',
-                        axisLabel: {
-                            formatter: '{value}'
-                        },
-                        axisPointer: {
-                            snap: true
-                        }
-                    }
-                ],
-                series : [
-                    {
-                        name:'道路客运',
-                        type:'line',
-                        data:[2.0, 4.9, 7.0, 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3]
-                    },
-                    {
-                        name:'道路货运',
-                        type:'line',
-                        
-                        data:[2.6, 5.9, 9.0, 26.4, 28.7, 70.7, 175.6, 182.2, 48.7, 18.8, 6.0, 2.3]
-                      
-                    },
-                    {
-                        name:'公交客运',
-                        type:'line',
-                        data:[3.2,6.6,9.3,12.4, 24.7, 67.7, 155.6, 132.2, 44.7, 20.8,13.2,7.8]
-                    },
-                    {
-                        name:'出租车运输',
-                        type:'line',
-                        data:[20, 49, 70, 232, 256, 160, 135.6, 100.2, 70.6, 50.0, 64, 33]
-                    },
-                    {
-                        name:'内河运输',
-                        type:'line',
-                       
-                        data:[6, 9, 16, 25.4, 29.7, 150.7, 180.6, 162.2, 130.7, 70.8, 16.0, 2.3]
-                      
-                    },
-                    {
-                        name:'海洋货运',
-                        type:'line',
-                        data:[7,16,9.3,18, 29, 80, 130.6, 170.2, 100.7, 25.8,11.2,7.8]
-                    },
-                    {
-                        name:'海洋客运',
-                        type:'line',
-                        data:[5,6.6,19.3,15.4, 27.7, 67.7, 100.6, 132.2,77.7, 50.8,13.2,7.8]
-                    }
-                ]
-            };
+        initRequestData(requestData){
+            var date = new Date;
+           // var year = date.getFullYear().toString();
+            var token = getCookie('token');
+            var userInfo = JSON.parse(getCookie('userInfo'));
+            requestData.token = token;
+            requestData.username = userInfo.name;
+            if(userInfo.roleName!=null && userInfo.roleName!="")
+                requestData.roleName = userInfo.roleName;
+            requestData.roleType = userInfo.roleType;
+            if(userInfo.place1!=null && userInfo.place1!="")
+                requestData.place1 =userInfo.place1;
+            if(userInfo.place2!=null && userInfo.place2!="")
+                requestData.place2 = userInfo.place2;          
+          //  requestData.timeRange = year+'-01-01:'+year+'-12-31';
+           
+        },
+        getDataFromService(requestData){
+            var _this = this;
+            unitEngChgChart.showLoading({text:'加载中'});
+            allEngChgChart.showLoading({text:'加载中'});
+            $.get(this.Constant.ajaxAddress+this.Constant.engchangeAjax,requestData).
+            done(function (res){
+                unitEngChgChart.hideLoading();
+                allEngChgChart.hideLoading();
+                if(res.errCode==30){//data ok
+                    setData(res);
+                    optionMonEngUnit.legend.data = dataForMonEngUnit[0];
+                   // optionMonEngUnit.xAxis[0].data = dataForMonEngUnit[1];
+                    optionMonEngUnit.series = dataForMonEngUnit[2];
+                    unitEngChgChart.clear();
+                    unitEngChgChart.setOption(optionMonEngUnit);
 
-            traTypPreChgChart.setOption(option);
-       }
+                    optionMonEngAll.legend.data = dataForMonEngAll[0];
+                   // optionMonEngAll.xAxis[0].data = dataForMonEngAll[1];
+                    optionMonEngAll.series = dataForMonEngAll[2];
+                    allEngChgChart.clear();
+                    allEngChgChart.setOption(optionMonEngAll);
+                }else if(res.errCode==31){ // data err
+                    window.log('unknow err');
+                }else if(res.errCode==44){ // auth 
+                    _this.$router.push('/login');
+                }
+
+            });
+
+        },
+        selectYearMonth(y){
+
+            if(!y||y=='')
+                return ;
+            
+            _year = y;
+            var date = new Date();
+            var year = date.getFullYear();
+            if(year==y){
+                var month = date.getMonth().toString();
+                y = y+'-01-01:'+y+'-'+month+'-31';
+            }else{
+                y = y +'-01-01:'+y+'-12-31';
+            }
+            requestData['timeRange']=y;
+            
+            this.getDataFromService(requestData);
+        }    
     },
     mounted:function(){
-        this.darwTraTypPreChgChart();
+        unitEngChgChart = echarts.init(document.getElementById('unitEngChgChart'));
+        unitEngChgChart.setOption(optionMonEngUnit);
+        allEngChgChart = echarts.init(document.getElementById('allEngChgChart'));
+        allEngChgChart.setOption(optionMonEngAll);
+        this.initRequestData(requestData);
+        //this.getDataFromService(requestData);
     },
     updated:function(){
-
+        console.log("update");
     }
 }
 </script>
@@ -129,9 +330,10 @@ export default {
         float: left;
         .chart-container{
              background-color: #F2F2F2; 
+             border-radius: 8px;
             .chart-header{
                 float: right;
-                margin-bottom: 20px;
+                margin-right: 20px;
                 position: relative;
             }
             .chart-content{
@@ -147,6 +349,13 @@ export default {
 
     .el-col {
         padding: 20px 20px;
+    }
+
+    .el-row {
+        margin-bottom: 15px;
+        &:last-child {
+        margin-bottom: 0;
+        }
     }
 </style>
 

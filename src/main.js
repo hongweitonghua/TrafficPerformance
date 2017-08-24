@@ -17,10 +17,15 @@ import 'font-awesome/css/font-awesome.min.css'
 //jquery引入
 import $ from 'jquery'
 import 'jquery.nicescroll'
-
-/*import VueResource from 'vue-resource'
+import * as Constant from './common/js/constant.js'
+import * as cityinfo from './common/js/cityinfo.js'
+import * as md5 from './common/js/jquery.md5.js'
+Vue.prototype.Constant = Constant
+Vue.prototype.cityinfo = cityinfo
+import VueResource from 'vue-resource'
 Vue.use(VueResource);
-*/
+
+import {getCookie,delCookie,setCookie} from './common/js/Cookie.js';
 
 Vue.use(ElementUI)
 Vue.use(VueRouter)
@@ -34,26 +39,37 @@ const router = new VueRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  //NProgress.start();
-  if (to.path == '/login') {
-    sessionStorage.removeItem('user');
+
+  console.log('main.js '+to.path);
+
+  if(!Vue.prototype.$userInfo || !Vue.prototype.$token){
+    var c  = getCookie('userInfo');
+    var ct  =   getCookie('token');
+    if(c&&c!="")  Vue.prototype.$userInfo = JSON.parse(c);
+    if(ct&&ct!="")  Vue.prototype.$token = ct;
+
+    console.log('before route');
+    console.log(Vue.prototype.$userInfo);
+    console.log(Vue.prototype.$token);
   }
-  let user = JSON.parse(sessionStorage.getItem('user'));
-  let path = to.path;
-  if (!user && path != '/login') {
-    if(path =='/register'){
-      next()
-    }else{
+
+
+  if(to.path == '/login'){
+    delete Vue.prototype.$userInfo;
+    delete Vue.prototype.$token;
+    delCookie('token','userInfo');
+  }
+
+  var token = getCookie('token');
+  if( to.path != '/login' && token=="")
       next({ path: '/login' })
-    }
-  } else {
-    next()
-  }
+  else
+      next()
 })
 
-//router.afterEach(transition => {
-//NProgress.done();
-//});
+router.afterEach(transition => {
+// NProgress.done();
+});
 
 new Vue({
   //el: '#app',

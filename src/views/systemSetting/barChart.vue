@@ -1,46 +1,51 @@
 <template>
-    <section class="chart">
+    <section class="chart" >
         <el-row> 
             <el-col class="chart-container">
                 <div class="chart-header">
-                    <el-select v-model="energyTypeSelect" placeholder="选择燃料类型" >
-                        <el-option key="汽油" label="汽油" value="汽油"></el-option>
-                        <el-option key="柴油" label="柴油" value="柴油"></el-option>
-                        <el-option key="CNG" label="CNG" value="CNG"></el-option>
-                        <el-option key="LPG" label="LPG" value="LPG"></el-option>
-                        <el-option key="LNG" label="LNG" value="LNG"></el-option>
-                        <el-option key="重油" label="重油" value="重油"></el-option>
-                        <el-option key="电力" label="电力" value="电力"></el-option>
-                    </el-select>                      
-                </div> 
+                    <el-date-picker
+                        v-model="endDate"
+                        type="month"
+                        placeholder="结束年月"
+                        @change="selectOther"
+                        :picker-options="pickerOptions0">
+                    </el-date-picker>
+                </div>
                 <div class="chart-header">
                     <el-date-picker
-                        v-model="dateSelectValue"
-                        type="daterange"
-                        placeholder="选择日期范围"
-                        :picker-options="pickerOptions2">
+                        v-model="beginDate"
+                        type="month"
+                        placeholder="起始年月"
+                        @change="selectOther"
+                        :picker-options="pickerOptions1">
                     </el-date-picker>
+                </div>
+                
+                <div class="chart-header2">
+                    统计期：{{ countDate }}
                 </div>
                 
                 
             </el-col>
         </el-row>
-        <el-row> 
+        <el-row > 
             <el-col :xs="24" :sm="24" :md="12" :lg="12" class="chart-container">                
                 <div id="energyPieChart" style="width:100%; height:400px;" class="chart-content"></div>
             </el-col>
             <el-col :xs="24" :sm="24" :md="12" :lg="12" class="chart-container">                
-                <div id="unitEnergyChart" style="width:100%; height:400px;" class="chart-content"></div>
-            </el-col>
+                <div id="companyChart" style="width:100%; height:400px;" class="chart-content"></div>
+            </el-col>   
+            
               
         </el-row>
         <el-row>
             <el-col :xs="24" :sm="24" :md="12" :lg="12" class="chart-container">                
-                <div id="distanceShipChart" style="width:100%; height:400px;" class="chart-content"></div>
-            </el-col>   
+                <div id="carTypeChart" style="width:100%; height:400px;" class="chart-content"></div>
+            </el-col>
             <el-col :xs="24" :sm="24" :md="12" :lg="12" class="chart-container">                
-                <div id="companyChart" style="width:100%; height:400px;" class="chart-content"></div>
-            </el-col>        
+                <div id="distanceChart" style="width:100%; height:400px;" class="chart-content"></div>
+            </el-col>   
+                 
         </el-row>
         <el-row> 
             <el-col  class="chart-container">                
@@ -54,10 +59,12 @@
             <el-col class="chart-container">
                 <div class="chart-header">
                     <el-date-picker
-                        v-model="yearSelectValue"
+                        v-model="year"
                         align="right"
                         type="year"
-                        placeholder="选择年">
+                        placeholder="选择年"
+                        @change="selectYearMonth"
+                        :picker-options="pickerOptions2">
                     </el-date-picker>
                 </div>
                 <div id="energyByYearChart" style="width:100%; height:400px;" class="chart-content"></div>
@@ -68,449 +75,723 @@
 
 <script>
     import echarts from 'echarts'
+    import {getCookie,delCookie,setCookie} from '../../common/js/Cookie.js';
+    var energyPieChart;
+    var companyChart;
+    var carTypeChart;
+    var distanceChart;
+    var guestChart;
+    var energyByYearChart;
 
-    const err_OK = 0;
+    var dataForEngAll = [];//各能源饼图
+    var dataForScalePer =[];//不同规模
+    var dataForCarPer = [];//车辆类型
+    var dataForDisPer =[];//运距类型
+    var dataForEngPsger = [];//能源客位
+    var dataForMon = [];//年度图表
+
+    var k=3; //标志
+
+    var _year=(new Date).getFullYear().toString();
+
+    var requestData = {}; 
+
+    var colors = ['#5793f3', '#d14a61'];
+    var option = {
+        color:colors,
+        title:{
+            text:'年度单耗、使用能耗关系图',
+            left:'center'
+
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'cross'
+            }
+        },
+        toolbox: {
+                show : true,
+                feature : {
+                    mark : {show: true},
+                    dataView : {readOnly:false},
+                    saveAsImage : {show: true}
+                },
+                right:'3%'
+            },
+        legend: {
+            data:['月使用能耗','单位能耗'],
+            top : 20
+        },
+        xAxis: [
+            {
+                type: 'category',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                data: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+                name:'月份',
+                nameGap:'20'
+            }
+        ],
+        yAxis: [
+            {
+                type: 'value',
+                name: '月使用能耗(万吨标准煤)',
+                axisLine: {
+                    lineStyle: {
+                        color: '#5793f3'
+                    }
+                },
+                axisLabel: {
+                    formatter: '{value} '
+                }
+            },
+            {
+                type: 'value',
+                name: '单位能耗(万吨标准煤/亿人公里)',
+                nameGap : 35,
+                nameLocation:'middle',
+                axisLine: {
+                    lineStyle: {
+                        color: '#d14a61'
+                    }
+                },
+                axisLabel: {
+                    formatter: '{value} '
+                }
+            }
+        ],
+        series: [
+            {
+                name:'月使用能耗',
+                type:'line'
+            },
+            {
+                name:'单位能耗',
+                type:'bar',
+                yAxisIndex: 1
+            }
+        ]
+    };
+    var optionPi = {
+        title:{
+            text: '道路客运能源结构图',
+            x: 'center'
+        },
+        tooltip : {
+            trigger: 'item',
+            formatter: "{a} <br/>{b} : {c} ({d}%)"
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            data: []
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                mark : {show: true},                 
+                dataView : {show: true, readOnly: false},
+                saveAsImage : {show: true},
+            },
+            right:'4%'
+        },
+        series : [
+            {
+                name: '能耗',
+                type: 'pie',
+                radius : '75%',
+                center: ['50%', '55%'],
+                data:[],
+            }
+        ]
+
+    };
+    var optionScale={
+        title:{
+            text: '不同规模企业单位能耗柱状图',
+            left:'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer : {            
+                type : 'shadow'        
+            }
+        },
+        legend: {
+            data:[]
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                mark : {show: true},
+                dataView : {readOnly:false},
+                saveAsImage : {show: true}
+                                
+            },
+            right:'4%'
+        },
+        xAxis: {
+            data: [],
+            name:'企业规模',
+            nameGap:'2'
+        },
+        yAxis: {
+            name:'单位能耗(万吨标煤/亿人公里)',
+            nameLocation:'middle',
+            nameGap:'40'
+        },
+        series : [
+            {
+                name:'单耗',
+                type:'bar',
+                barMaxWidth:'60%',
+                data:[]
+            }
+        ]
+    };
+    var optionCarType={
+        title:{
+            text: '不同车辆类型单位能耗柱状图',
+            left:'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer : {            
+                type : 'shadow'        
+            }
+        },
+        legend: {
+            data:[]
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                mark : {show: true},
+                dataView : {readOnly:false},
+                saveAsImage : {show: true}
+                                
+            },
+            right:'4%'
+        },
+        xAxis: {
+            data: [],
+            name:'车辆类型',
+            nameGap:'2'
+        },
+        yAxis: {
+            name:'单位能耗(万吨标煤/亿人公里)',
+            nameLocation:'middle',
+            nameGap:'40'
+        },
+        series : [
+            {
+                name:'单耗',
+                type:'bar',
+                barMaxWidth:'60%',
+                data:[]
+            }
+        ]
+    };
+    var optionDistance={
+        title:{
+            text: '不同运距车辆单位能耗柱状图',
+            left:'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer : {            
+                type : 'shadow'        
+            }
+        },
+        legend: {
+            data:[]
+        },
+        toolbox: {
+            show : true,
+            feature : {
+            mark : {show: true},
+            dataView : {readOnly:false},
+            saveAsImage : {show: true}
+                                
+            }
+        },
+        xAxis: {
+            data: [],
+            name:'运输距离',
+            nameGap:'2'
+        },
+        yAxis: {
+            name:'单位能耗(万吨标煤/亿人公里)',
+            nameLocation:'middle',
+            nameGap:'40'
+        },
+        series : [
+            {
+                name:'单耗',
+                type:'bar',
+                barMaxWidth:'60%',
+                data:[]
+            }
+        ]
+    };
+    var optionEngPsger={
+        title: {
+            text: '不同燃料类型不同客位车辆单位能耗柱状图',
+            left:'center'
+        },
+        dataZoom: [
+            {
+                id: 'dataZoomX',
+                type: 'slider',
+                xAxisIndex: [0],
+                filterMode: 'filter'
+            }
+        ],
+        legend: {
+            data:[],
+            top : 30
+        },
+        tooltip : {
+            trigger: 'axis',
+            axisPointer : {            // 坐标轴指示器，坐标轴触发有效
+                type : 'shadow'        // 默认为直线，可选为：'line' | 'shadow'
+            }
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                mark : {show: true},
+                magicType : {show: true, type: ['line', 'bar']},
+                dataView : {readOnly:false},
+                saveAsImage : {show: true}
+            },
+            right:'3%'
+        },
+        xAxis : [
+            {
+                type : 'category',
+                data : [],
+                name :'燃料类型',
+                nameGap:5
+            }
+        ],
+        yAxis : [
+            {
+                type : 'value',
+                nameLocation : 'middle',
+                name : '单位能耗(单位：万吨标准煤/亿人公里)',
+                nameGap : 35
+            }
+        ],
+        series : []
+    };
+
+    function setData(res){
+        var monthData = new Object();
+        var engerData = {};
+        var scaleData={};
+        var carTypeData={};
+        var distanceData={};
+        var engPsgerMap={};
+
+        var month_all = new Array();//能耗
+        var month_per = new Array();// eng_cl_e / eng_cl_l ;
+        var eng_all_for_PI = []; //饼图填充数据
+        var eng_per_for_scale =[];
+        var eng_per_for_car =[];
+        var eng_per_for_dis = [];
+        var engPsgerSeries = [];
+
+        var xAisMon = [_year+'-01',_year+'-02',_year+'-03',_year+'-04',_year+'-05',_year+'-06',
+            _year+'-07',_year+'-08',_year+'-09',_year+'-10',_year+'-11',_year+'-12']
+
+        res.engTypOther.forEach(function(element){
+
+            element.engTypMo.forEach(function(e2){
+                var t = monthData[e2.type];
+                if(!t) t = [0,0];
+                t[0] += e2.typDatOfAllEng;
+                t[1] += e2.typDatOfAllLen;
+                monthData[e2.type] = t;
+            });
+
+            element.engTypSs.forEach(function(e2){
+                if (!engPsgerMap[e2.type]) 
+                    engPsgerMap[e2.type] ={};
+                if(!engPsgerMap[e2.type][element.baseTyp])
+                    engPsgerMap[e2.type][element.baseTyp] =[0,0];
+                
+                var t = engPsgerMap[e2.type][element.baseTyp];
+                t[0] += e2.typDatOfAllEng;
+                t[1] += e2.typDatOfAllLen;
+                engPsgerMap[e2.type][element.baseTyp] = t;
+
+                var t = engerData[element.baseTyp];
+                if(!t) t = [0,0];
+                t[0] += e2.typDatOfAllEng;
+                t[1] += e2.typDatOfAllLen;
+                engerData[element.baseTyp] = t; 
+            });
+        });
+
+        res.entTypOther.forEach(function(element){
+            var t = scaleData[element.baseTyp];
+            if(!t) t = [0,0];
+            t[0] += element.baseTypDatOfAllEng;
+            t[1] += element.baseTypDatOfAllLen;
+            scaleData[element.baseTyp] = t;
+        });
+
+
+        res.disTypOther.forEach(function(element){
+            var t = distanceData[element.baseTyp];
+            if(!t) t=[0,0];
+            t[0] += element.baseTypDatOfAllEng;
+            t[1] += element.baseTypDatOfAllLen;
+            distanceData[element.baseTyp] = t;
+        });
+
+        res.carTypOther.forEach(function(element){
+            var t = carTypeData[element.baseTyp];
+            if(!t) t=[0,0];
+            t[0] += element.baseTypDatOfAllEng;
+            t[1] += element.baseTypDatOfAllLen;
+            carTypeData[element.baseTyp] = t;
+        });
+
+        //准备能源数据
+        res.xs[1].forEach(function(e1){
+            var t = engerData[e1];
+            if(t)
+            {
+                eng_all_for_PI.push({name:e1,value:(t[0]/10000).toFixed(2)})
+            }else{
+            }
+        });
+
+        //准备企业规模柱状图数据
+        res.xs[3].forEach(function(e1){
+            var t = scaleData[e1];
+            if(t){
+                eng_per_for_scale.push((t[0]/t[1]).toFixed(2));
+            }else{
+                eng_per_for_scale.push(0);
+            }
+        });
+
+        //准备不同运距柱状图数据
+        res.xs[4].forEach(function(e1){
+            var t = distanceData[e1];
+            if(t){
+                eng_per_for_dis.push((t[0]/t[1]).toFixed(2));
+            }else{
+                eng_per_for_dis.push(0);
+            }
+        });
+
+        //准备不同车辆类型柱状图数据
+        res.xs[5].forEach(function(e1){
+            var t = carTypeData[e1];
+            if(t){
+                eng_per_for_car.push((t[0]/t[1]).toFixed(2));
+            }else{
+                eng_per_for_car.push(0);
+            }
+        });
+
+        //准备燃料客位柱状图数据
+        res.xs[2].forEach(function(i){
+            var tmpEngDatas =[];
+            if(!engPsgerMap[i]){
+                var tmpSeriseObj = {
+                        name:i,
+                        type:'bar',
+                        data:[]
+                };
+                engPsgerSeries.push(tmpSeriseObj);
+            }else{
+                res.xs[1].forEach(function(e1){
+                    var t = engPsgerMap[i][e1];
+                    if(t)
+                    {
+                        tmpEngDatas.push((t[0]/t[1]).toFixed(2))
+                    }else{
+                        //eng_all_for_PI.push({name:e1,value:0})
+                        tmpEngDatas.push(0);
+                    }
+                });
+                var tmpSeriseObj = {
+                    name:i,
+                    type:'bar',
+                    data:tmpEngDatas
+                };
+                engPsgerSeries.push(tmpSeriseObj);
+            }
+        });
+
+        if (k==1||k==3) {
+            dataForEngAll.splice(0,dataForEngAll.length);
+            dataForEngAll.push(res.xs[1]);
+            dataForEngAll.push(eng_all_for_PI);
+
+            dataForScalePer.splice(0,dataForScalePer.length);
+            dataForScalePer.push(res.xs[3]);
+            dataForScalePer.push(eng_per_for_scale);
+
+            dataForDisPer.splice(0,dataForDisPer.length);
+            dataForDisPer.push(res.xs[4]);
+            dataForDisPer.push(eng_per_for_dis);
+
+            dataForCarPer.splice(0,dataForCarPer.length);
+            dataForCarPer.push(res.xs[5]);
+            dataForCarPer.push(eng_per_for_car);
+
+            dataForEngPsger.splice(0,dataForEngPsger.length);
+            dataForEngPsger.push(res.xs[2]);
+            dataForEngPsger.push(res.xs[1]);
+            dataForEngPsger.push(engPsgerSeries);
+        }
+
+        //准备年度数据
+        xAisMon.forEach(function(e1){
+            var t = monthData[e1];
+            if(t) 
+            {
+                month_all.push((t[0]/10000).toFixed(2));
+                month_per.push((t[0]/t[1]).toFixed(2));
+            }else
+            {
+                month_all.push(0);
+                month_per.push(0);
+            }
+        });
+
+        if (k==2) {
+            dataForMon.splice(0,dataForMon.length);
+            dataForMon.push(res.xs[0]);
+            dataForMon.push(month_all);
+            dataForMon.push(month_per);
+        }
+
+    };
+
+
     export default {
         data() {
             return {
-                pickerOptions2: {
-                    shortcuts: [{
-                        text: '最近一周',
-                        onClick(picker) {
-                            const end = new Date();
-                            const start = new Date();
-                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
-                            picker.$emit('pick', [start, end]);
-                        }
-                    }, {
-                        text: '最近一个月',
-                        onClick(picker) {
-                            const end = new Date();
-                            const start = new Date();
-                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
-                            picker.$emit('pick', [start, end]);
-                        }
-                    }, {
-                            text: '最近三个月',
-                            onClick(picker) {
-                            const end = new Date();
-                            const start = new Date();
-                            start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
-                            picker.$emit('pick', [start, end]);
-                        }
-                    }]
+                year:'',
+                countDate: '',
+                beginDate:'',
+                endDate:'',
+                pickerOptions0: {
+                    disabledDate(time) {
+                        if(time.getFullYear()>(new Date()).getFullYear())
+                            return true;
+                        if(time.getFullYear()==(new Date()).getFullYear())
+                            return time.getMonth() >= (new Date()).getMonth();
+                        else
+                            return false;        
+                    }
                 },
-                dateSelectValue:'',
-                yearSelectValue:'',
-                energyTypeSelect:''
+                pickerOptions1: {
+                    disabledDate(time) {
+                        if(time.getFullYear()>(new Date()).getFullYear())
+                            return true;
+                        if(time.getFullYear()==(new Date()).getFullYear())
+                            return time.getMonth() >= (new Date()).getMonth();
+                        else
+                            return false;        
+                    }
+                },
+                pickerOptions2: {
+                    disabledDate(time) {
+                        if((new Date()).getMonth==0)
+                            return time.getFullYear()>=(new Date()).getFullYear();
+                        else
+                            return time.getFullYear()>(new Date()).getFullYear();
+                    }
+                }
             }
         },
         methods: {
-            drawGuestTypeChart(){
-                let guestChart = echarts.init(document.getElementById('guestChart'));
-                let option = {
-                    title: {
-                    text: '不同客位车辆单位能耗图'
-                    },
-                    tooltip: {
-                        trigger: 'axis',
-                        axisPointer : {            
-                            type : 'shadow'        
-                        }
-                    },
-            
-                    legend: {
-                       // orient: 'vertical',
-                        //y:'bottom',
-                       // x:'center',
-                        data:['一客位','二客位','三客位','四客位']
-                    },
-                    toolbox: {
-                        show : true,
-                        feature : {
-                        mark : {show: true},
-                        dataView : {readOnly:false},
-                        saveAsImage : {show: true}
-                                            
-                        }
-                    },
-                    xAxis: {
-                        data: ['汽油', '柴油', 'CNG', 'LPG', 'LNG', '重油', '电力'],
-                        name:'燃料类型',
-                        nameGap:'10'
-                    },
-                    yAxis: {
-                        name:'单位能耗(万吨标煤/亿吨公里)',
-                        nameLocation:'middle',
-                        nameGap:'40'
-                    },
-                    series : [
-                        {
-                            name:'一客位',
-                            type:'bar',
-                            data:[0.123, 0.2, 0.321, 0.134,0.231,0.142,0.213]
-                        },
-                        {
-                            name:'二客位',
-                            type:'bar',
-                            data:[0.323, 0.3, 0.121, 0.231,0.131,0.242,0.243]
-                        
-                        },
-                        {
-                            name:'三客位',
-                            type:'bar',
-                            data:[0.423, 0.35, 0.221, 0.331,0.251,0.122,0.343]
-                        },
-                        {
-                            name:'四客位',
-                            type:'bar',
-                            data:[0.453, 0.42, 0.241, 0.281,0.351,0.322,0.393]
-                        }
-                        
-                    ]
-                };
-                guestChart.setOption(option);
-               
-            },
-            drawCompanyTypeChart(){
-                let companyChart = echarts.init(document.getElementById('companyChart'));
-                let option = {
-                    title: {
-                    text: '不同规模企业单位能耗图'
-                    },
-                    tooltip: {},
-            
-                    legend: {
-                        data:['单耗']
-                    },
-                    color: ['#3398DB'],
-                    toolbox: {
-                        show : true,
-                        feature : {
-                        mark : {show: true},
-                        saveAsImage : {show: true},
-                        dataView : {readOnly:false},
-                        magicType : {show: true, type: ['line', 'bar']},                   
-                        }
-                    },
-                    xAxis: {
-                        data: ["一规模","二规模","三规模","四规模","五规模","六规模","七规模"]
-                    },
-                    yAxis: {},
-                        series: [{
-                        name: '单耗',
-                        type: 'bar',
-                        barWidth: '60%',
-                        data: [45, 20, 36, 10, 28, 16,55]
-                    }]
-                };
-                companyChart.setOption(option);
-            },
-            drawUnitEnergyChart(){
-                let unitEnergyChart = echarts.init(document.getElementById('unitEnergyChart'));
-                let option = {
-                    title : {
-                        text: '不同车辆类型单位能耗图',
-                    },
-                    tooltip : {
-                        trigger: 'axis',
-                        axisPointer : {            
-                            type : 'shadow'        
-                        }
-                    },
-                    legend: {
-                       // orient: 'vertical',
-                        x:'center',
-                       // data:['集装箱船','干散货船','件杂货船','液体散货船','客滚船']
-                       data:['单耗'] //
-                    },
-                    toolbox: {
-                        show : true,
-                        feature : {
-                            dataView : {show: true, readOnly: false},
-                            magicType : {show: true, type: ['line', 'bar']},     
-                            saveAsImage : {show: true}
-                            
-                        }
-                    },
-                    
-                    calculable : true,
-                    xAxis : [
-                        {
-                            name:'燃料类型',
-                            type : 'category',
-                            nameGap:'5',
-                            //data : ['<1000','1000~3000','3000~10000','>10000']
-                            data: ['一类车', '二类车', '三类车', '四类车', '五类车']
-                        }
-                    ],
-                    yAxis : [
-                        {
-                            type : 'value',
-                            name: '单耗(万吨标准煤/亿吨公里)',
-                            nameLocation:'middle',
-                            nameGap:'40'
-                        }
-                    ],
-                    series : [
-                        /*{
-                            name:'集装箱船',
-                            type:'bar',
-                            data:[7.0, 23.2, 25.6, 76.7]
-                        },
-                        {
-                            name:'干散货船',
-                            type:'bar',
-                            data:[26.4, 28.7, 70.7, 175.6]
-                        
-                        },
-                        {
-                            name:'件杂货船',
-                            type:'bar',
-                            data:[12.4, 24.7, 67.7, 155.6]
-                        },
-                        {
-                            name:'液体散货船',
-                            type:'bar',
-                            data:[17.4, 26.7, 47.7, 55.6]
-                        },
-                        {
-                            name:'客滚船',
-                            type:'bar',
-                            data:[31.4, 36.7, 40.7, 123.6]
-                        },*/
-                        {
-                            name: '单耗',
-                            type: 'bar',
-                            barWidth: '40%',
-                            data: [4.1, 2.3, 5.4, 2.5,1.9]
-                        }
-                        
-                    ]
-                };
-                unitEnergyChart.setOption(option);
-            },
-            drawDistanceShipChart(){
-                let distanceShipChart = echarts.init(document.getElementById('distanceShipChart'));
-                let option = {
-                    title: {
-                    text: '不同运距车辆单位能耗图'
-                    },
-                    tooltip: {
-                        trigger: 'axis',
-                        axisPointer : {            
-                            type : 'shadow'        
-                        }
-                    },
-                    legend: {
-                        //data:['一运距','二运距','三运距','四运距']
-                        data:['单耗']//
-                    },
-                    toolbox: {
-                        show : true,
-                        feature : {
-                            mark : {show: true},
-                            dataView : {readOnly:false},
-                            saveAsImage : {show: true},
-                            magicType : {show: true, type: ['line', 'bar']}                               
-                        }
-                    },
-                    xAxis: {
-                        //data: ['汽油', '柴油', 'CNG', 'LPG', 'LNG', '重油', '电力'],
-                        data:['一运距','二运距','三运距','四运距'],//
-                        name:'燃料类型',
-                        nameGap:'5'
-                    },
-                    yAxis: {
-                        name:'单位能耗(万吨标煤/亿吨公里)',
-                        nameLocation:'middle',
-                        nameGap:'40'
-                    },
-                    series : [
-                        /*{
-                            name:'一运距',
-                            type:'bar',
-                            data:[0.123, 0.2, 0.321, 0.134,0.231,0.142,0.213]
-                        },
-                        {
-                            name:'二运距',
-                            type:'bar',
-                            data:[0.323, 0.3, 0.121, 0.231,0.131,0.242,0.243]
-                        
-                        },
-                        {
-                            name:'三运距',
-                            type:'bar',
-                            data:[0.423, 0.35, 0.221, 0.331,0.251,0.122,0.343]
-                        },
-                        {
-                            name:'四运距',
-                            type:'bar',
-                            data:[0.453, 0.42, 0.241, 0.281,0.351,0.322,0.393]
-                        }*/
-                        {
-                            name: '单耗',
-                            type: 'bar',
-                            barWidth: '40%',
-                            data: [45, 20, 36, 10]
-                        }
-                        
-                    ]
-                };
-                distanceShipChart.setOption(option);
-            },
-            drawEnergyPieChart(){
-                let energyPieChart = echarts.init(document.getElementById('energyPieChart'));
-                let option={
-                    title:{
-                        text: '道路客运能源结构图',
-                        x: 'center'
-                    },
-                    tooltip : {
-                        trigger: 'item',
-                        formatter: "{a} <br/>{b} : {c} ({d}%)"
-                    },
-                    legend: {
-                        orient: 'vertical',
-                        left: 'left',
-                        data: ['汽油','柴油','CNG','LPG','LNG','重油','电力']
-                    },
-                    toolbox: {
-                        show : true,
-                        feature : {
-                            mark : {show: true},                 
-                            dataView : {show: true, readOnly: false},
-                            saveAsImage : {show: true},
-                        }
-                    },
-                    series : [
-                        {
-                            name: '能耗',
-                            type: 'pie',
-                            radius : '80%',
-                            center: ['50%', '50%'],
-                            data:[
-                                {value:535, name:'汽油'},
-                                {value:410, name:'柴油'},
-                                {value:474, name:'CNG'},
-                                {value:235, name:'LPG'},
-                                {value:200, name:'LNG'},
-                                {value:354, name:'重油'},
-                                {value:401,name:'电力'}
-                            ].sort(function(a,b){return a.value-b.value;}),
-                            roseType: 'radius',
-                            label:{
-                                normal:{
-                                    testStyle:{
-                                        color: 'rgba(255, 255, 255, 0.5)'
-                                    }
-                                }
-                            },
-                            labelLine: {
-                                 normal: {
-                                    smooth: 0.2,
-                                    length: 10,
-                                    length2: 20
-                                }
-                            
-                            },
-                            animationType: 'scale',
-                            animationEasing: 'elasticOut',
-                            animationDelay: function (idx) {
-                                return Math.random() * 200;
-                             }
-                        }
-                    ]
-                };
-                energyPieChart.setOption(option);
-            },     
-            drawenergyByYearChart(){
-                let energyByYearChart = echarts.init(document.getElementById('energyByYearChart'));
-                let colors = ['#5793f3', '#d14a61'];
-                let option = {
-                    color:colors,
-                    title:{
-                        text:'年度单耗、使用能耗关系图'
-                    },
-                    tooltip: {
-                        trigger: 'axis',
-                        axisPointer: {
-                            type: 'cross'
-                        }
-                    },
+            initRequestData(requestData){
+                var date = new Date;
+                var year = date.getFullYear();
+                var month = date.getMonth();
+                if(month==0){
+                    year = year -1;
+                    month = 12;
+                }else{
+                    if(month>=1 && month<=9)
+                        month = '0'+month;
+                }
+                var token = getCookie('token');
+                var userInfo = JSON.parse(getCookie('userInfo'));
+                requestData.token = token;
+                requestData.username = userInfo.name;
+                if(userInfo.roleName!=null && userInfo.roleName!="")
+                    requestData.roleName = userInfo.roleName;
+                requestData.roleType = userInfo.roleType;
+                if(userInfo.place1!=null && userInfo.place1!="")
+                    requestData.place1 =userInfo.place1;
+                if(userInfo.place2!=null && userInfo.place2!="")
+                    requestData.place2 = userInfo.place2;          
+                requestData.timeRange = year+'-'+month+'-01:'+year+'-'+month+'-31';
 
-                    legend: {
-                        data:['单位能耗','月使用能耗']
-                    },
-                    xAxis: [
+                this.countDate = year+'年'+month+'月';
+                
+            },
+            getDataFromService(requestData){
+                var _this = this;
+                if(k==1||k==3){
+                    energyPieChart.showLoading({text:'加载中'});
+                    companyChart.showLoading({text:'加载中'});
+                    carTypeChart.showLoading({text:'加载中'});
+                    distanceChart.showLoading({text:'加载中'});
+                    guestChart.showLoading({text:'加载中'});
+                }
+                if(k==2){
+                    energyByYearChart.showLoading({text:'加载中'});
+                }
+                $.get(this.Constant.ajaxAddress+this.Constant.roadpassAjax,requestData).
+                done(function (res){
+                    if(k==1||k==3){
+                        energyPieChart.hideLoading();
+                        companyChart.hideLoading();
+                        carTypeChart.hideLoading();
+                        distanceChart.hideLoading();
+                        guestChart.hideLoading();
+                    }
+                    if(k==2){
+                        energyByYearChart.hideLoading();
+                    }
+                    if(res.errCode==30){//data ok
+                        setData(res);
+                        if(k==1||k==3)
                         {
-                            type: 'category',
-                            axisPointer: {
-                                type: 'shadow'
-                            },
-                            data: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+                           // optionPi.legend.data = dataForEngAll[0];
+                            optionPi.series[0].data = dataForEngAll[1];
+                            energyPieChart.clear();
+                            energyPieChart.setOption(optionPi);
+
+                            optionScale.xAxis.data = dataForScalePer[0];
+                            optionScale.series[0].data = dataForScalePer[1];
+                            companyChart.clear();
+                            companyChart.setOption(optionScale);
+
+                            optionDistance.xAxis.data = dataForDisPer[0];
+                            optionDistance.series[0].data = dataForDisPer[1];
+                            distanceChart.clear();
+                            distanceChart.setOption(optionDistance);
+
+                            optionCarType.xAxis.data = dataForCarPer[0];
+                            optionCarType.series[0].data = dataForCarPer[1];
+                            carTypeChart.clear();
+                            carTypeChart.setOption(optionCarType);
+
+                            optionEngPsger.legend.data = dataForEngPsger[0];
+                            optionEngPsger.xAxis[0].data = dataForEngPsger[1];
+                            optionEngPsger.series = dataForEngPsger[2];
+                            guestChart.clear();
+                            guestChart.setOption(optionEngPsger);
+
+
                         }
-                    ],
-                    yAxis: [
-                        {
-                            type: 'value',
-                            name: '月使用能耗(万吨标准煤)',
-                            min: 0,
-                            max: 500,
-                            interval: 50,
-                            axisLine: {
-                                lineStyle: {
-                                    color: '#5793f3'
-                                }
-                            },
-                            axisLabel: {
-                                formatter: '{value} '
-                            }
-                        },
-                        {
-                            type: 'value',
-                            name: '单位能耗(万吨标准煤/亿人公里)',
-                            min: 0,
-                            max: 200,
-                            axisLine: {
-                                lineStyle: {
-                                    color: '#d14a61'
-                                }
-                            },
-                            axisLabel: {
-                                formatter: '{value} '
-                            }
+                        if(k ==2){
+                            
+                           // option.xAxis[0].data =  dataForMon[0];
+                            option.series[1].data = dataForMon[2];
+                            option.series[0].data = dataForMon[1];
+                            energyByYearChart.clear();
+                            energyByYearChart.setOption(option);
                         }
-                    ],
-                    series: [
-                        {
-                            name:'月使用能耗',
-                            type:'line',
-                            data:[200, 220, 330, 450, 490, 102, 230, 234, 345, 165, 170, 400]
-                        },
-                        {
-                            name:'单位能耗',
-                            type:'bar',
-                            data:[20, 49, 70, 130, 125, 178, 135.6, 162.2, 132, 180, 178, 145]
-                        }
-                    ]
-                };  
-                energyByYearChart.setOption(option);
-            },  
-            drawCharts() {
-                this.drawGuestTypeChart()
-                this.drawCompanyTypeChart()
-                this.drawUnitEnergyChart()
-                this.drawDistanceShipChart()
-                this.drawEnergyPieChart()
-                this.drawenergyByYearChart()
-            }
+
+                    }else if(res.errCode==31){ // data err
+                        window.log('unknow err');
+                    }else if(res.errCode==44){ // auth 
+                        _this.$router.push('/login');
+                    }  
+                });
+                
+            },
+            selectOther(){
+                k = 1;
+                if(this.beginDate!='' && this.endDate!=''){
+                    if(this.beginDate > this.endDate){
+                        this.$message({
+                            showClose: true,
+                            message: '起始年月不能大于结束年月',
+                            type: 'warning',
+                            duration:2500
+                        });
+                        return;
+                    }
+                    var by = this.beginDate.getFullYear();
+                    var bm = this.beginDate.getMonth()+1;
+                    if(bm>=1 && bm <=9)
+                        bm = '0'+bm;
+                    if(this.beginDate == this.endDate){
+                        requestData['timeRange'] = by + '-' + bm +'-01:' + by + '-' +bm + '-31';
+                        this.countDate = by+'年'+bm+'月';
+                    }else{
+                        var ey = this.endDate.getFullYear();
+                        var em = this.endDate.getMonth()+1;
+                        if(em>=1 && em <=9)
+                            em = '0'+em;
+                        requestData['timeRange'] = by + '-' + bm +'-01:' + ey + '-' + em + '-31';
+                        this.countDate = by+'年'+bm+'月 至 '+ey+'年'+em+'月';
+                    }
+                    this.getDataFromService(requestData);
+
+                   
+
+                }
+
+
+            },
+            selectYearMonth(y){
+                k =2;
+
+                if(!y||y=='')
+                    return ;
+                
+                _year = y;
+                var date = new Date();
+                var year = date.getFullYear();
+                if(year==y){
+                    var month = date.getMonth().toString();
+                    y = y+'-01-01:'+y+'-'+month+'-31';
+                }else{
+                    y = y +'-01-01:'+y+'-12-31';
+                }
+                requestData['timeRange']=y;
+                
+                this.getDataFromService(requestData);
+            } 
+            
         },
         mounted: function () {
-            this.drawCharts();
+            energyPieChart = echarts.init(document.getElementById('energyPieChart'));
+            companyChart = echarts.init(document.getElementById('companyChart'));
+            distanceChart = echarts.init(document.getElementById('distanceChart'));
+            carTypeChart = echarts.init(document.getElementById('carTypeChart'));
+            guestChart = echarts.init(document.getElementById('guestChart'));
+            energyByYearChart = echarts.init(document.getElementById('energyByYearChart'));
+            
+            energyPieChart.setOption(optionPi);
+            companyChart.setOption(optionScale);
+            distanceChart.setOption(optionDistance);
+            carTypeChart.setOption(optionCarType);
+            guestChart.setOption(optionEngPsger);
+            energyByYearChart.setOption(option);
+            this.initRequestData(requestData);
+            this.getDataFromService(requestData);
+
         },
         updated: function () {
-            this.drawCharts()
+            console.log("update");
         }
     }
 </script>
@@ -521,10 +802,17 @@
         float: left;
         .chart-container{
              background-color: #F2F2F2; 
+             border-radius: 8px;
             .chart-header{
                 float: right;
-                margin-bottom: 10px;
                 margin-right: 20px;
+                position: relative;
+            }
+            .chart-header2{
+                float: left;
+                font-weight:500;
+                margin-left: 20px;
+                top:10px;
                 position: relative;
             }
             .chart-content{
@@ -533,12 +821,15 @@
         }
         
     }
-    /*.chart div {
-        height: 400px;
-        float: left;
-    }*/
 
     .el-col {
         padding: 15px 15px;
+        border-radius: 4px;
+    }
+    .el-row {
+        margin-bottom: 15px;
+        &:last-child {
+        margin-bottom: 0;
+        }
     }
 </style>

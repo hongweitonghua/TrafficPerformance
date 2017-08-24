@@ -16,4 +16,6 @@ export const editUser = params => { return axios.get(`${base}/user/edit`, { para
 
 export const addUser = params => { return axios.get(`${base}/user/add`, { params: params }); };
 
+// export const addCarNum = params => { return axios.get(`${base}/user/add`, { params: params }); };
+
 export const getChartColumeData = params => { return axios.get(`${base}/api/chartColume`, { params: params }); };
